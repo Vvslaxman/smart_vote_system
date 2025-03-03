@@ -1,0 +1,44 @@
+Loading face detection models...
+face.ts:19 Error loading face detection models: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+loadModels @ face.ts:19
+await in loadModels
+getFaceDescriptors @ face.ts:48
+startCapture @ register.tsx:82
+await in startCapture
+callCallback2 @ chunk-XQLYTHWV.js?v=b6ac9a88:3674
+invokeGuardedCallbackDev @ chunk-XQLYTHWV.js?v=b6ac9a88:3699
+invokeGuardedCallback @ chunk-XQLYTHWV.js?v=b6ac9a88:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-XQLYTHWV.js?v=b6ac9a88:3736
+executeDispatch @ chunk-XQLYTHWV.js?v=b6ac9a88:7014
+processDispatchQueueItemsInOrder @ chunk-XQLYTHWV.js?v=b6ac9a88:7034
+processDispatchQueue @ chunk-XQLYTHWV.js?v=b6ac9a88:7043
+dispatchEventsForPlugins @ chunk-XQLYTHWV.js?v=b6ac9a88:7051
+(anonymous) @ chunk-XQLYTHWV.js?v=b6ac9a88:7174
+batchedUpdates$1 @ chunk-XQLYTHWV.js?v=b6ac9a88:18913
+batchedUpdates @ chunk-XQLYTHWV.js?v=b6ac9a88:3579
+dispatchEventForPluginEventSystem @ chunk-XQLYTHWV.js?v=b6ac9a88:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-XQLYTHWV.js?v=b6ac9a88:5478
+dispatchEvent @ chunk-XQLYTHWV.js?v=b6ac9a88:5472
+dispatchDiscreteEvent @ chunk-XQLYTHWV.js?v=b6ac9a88:5449Understand this errorAI
+register.tsx:100 Face capture error: Error: Failed to load face detection models. Please ensure models are available.
+    at loadModels (face.ts:20:11)
+    at async getFaceDescriptors (face.ts:48:3)
+    at async startCapture (register.tsx:82:31)
+startCapture @ register.tsx:100
+await in startCapture
+callCallback2 @ chunk-XQLYTHWV.js?v=b6ac9a88:3674
+invokeGuardedCallbackDev @ chunk-XQLYTHWV.js?v=b6ac9a88:3699
+invokeGuardedCallback @ chunk-XQLYTHWV.js?v=b6ac9a88:3733
+invokeGuardedCallbackAndCatchFirstError @ chunk-XQLYTHWV.js?v=b6ac9a88:3736
+executeDispatch @ chunk-XQLYTHWV.js?v=b6ac9a88:7014
+processDispatchQueueItemsInOrder @ chunk-XQLYTHWV.js?v=b6ac9a88:7034
+processDispatchQueue @ chunk-XQLYTHWV.js?v=b6ac9a88:7043
+dispatchEventsForPlugins @ chunk-XQLYTHWV.js?v=b6ac9a88:7051
+(anonymous) @ chunk-XQLYTHWV.js?v=b6ac9a88:7174
+batchedUpdates$1 @ chunk-XQLYTHWV.js?v=b6ac9a88:18913
+batchedUpdates @ chunk-XQLYTHWV.js?v=b6ac9a88:3579
+dispatchEventForPluginEventSystem @ chunk-XQLYTHWV.js?v=b6ac9a88:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-XQLYTHWV.js?v=b6ac9a88:5478
+dispatchEvent @ chunk-XQLYTHWV.js?v=b6ac9a88:5472
+dispatchDiscreteEvent @ chunk-XQLYTHWV.js?v=b6ac9a88:5449Understand this errorAI
+register.tsx:123 Stopping face capture...
