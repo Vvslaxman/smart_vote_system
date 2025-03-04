@@ -4,6 +4,8 @@ import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 app.use(express.json());
+app.use(express.static('client/public'));
+app.use('/models', express.static('client/public/models'));
 app.use(express.urlencoded({ extended: false }));
 
 app.use((req, res, next) => {

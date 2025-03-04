@@ -8,10 +8,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/voters", async (req, res) => {
     try {
       const voter = insertVoterSchema.parse(req.body);
+      
+      // Additional validation for face descriptors
+      if (!voter.faceDescriptors || voter.faceDescriptors.length === 0) {
+        return res.status(400).json({ 
+          error: "Invalid voter data",
+          details: "Face descriptors are required for registration" 
+        });
+      }
+      
       const created = await storage.createVoter(voter);
       res.json(created);
     } catch (error) {
-      res.status(400).json({ error: "Invalid voter data" });
+      console.error("Voter registration error:", error);
+      res.status(400).json({ 
+        error: "Invalid voter data",
+        details: error instanceof Error ? error.message : "Unknown error" 
+      });
     }
   });
 

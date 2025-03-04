@@ -9,6 +9,7 @@ import { getFaceDescriptor, compareFaces } from "@/lib/face";
 import type { Voter, Candidate } from "@shared/schema";
 import { Loader2, Camera } from "lucide-react";
 import { useLocation } from "wouter";
+import { Progress } from "@/components/ui/progress";
 
 export default function Vote() {
   const [aadharId, setAadharId] = useState("");
@@ -118,9 +119,13 @@ export default function Vote() {
     }
   }
 
+  const [verificationInProgress, setVerificationInProgress] = useState(false);
+  const [verificationConfidence, setVerificationConfidence] = useState<number | null>(null);
+
   async function verifyFace() {
     try {
       if (!videoRef.current || !voter) return;
+      setVerificationInProgress(true);
 
       const canvas = document.createElement("canvas");
       canvas.width = videoRef.current.videoWidth;
@@ -134,24 +139,37 @@ export default function Vote() {
       await new Promise(resolve => img.onload = resolve);
 
       const liveDescriptor = await getFaceDescriptor(img);
-      const storedDescriptors = voter.faceDescriptors.map(d => new Float32Array(JSON.parse(d)));
+      const storedDescriptors = voter.faceDescriptors.map(d => {
+        try {
+          // Handle both string and array formats
+          const descriptorData = Array.isArray(d) ? d : JSON.parse(String(d));
+          return new Float32Array(descriptorData);
+        } catch (e) {
+          console.warn("Error parsing descriptor:", e);
+          return new Float32Array(128);
+        }
+      });
+
+      const confidence = calculateMatchConfidence(liveDescriptor, storedDescriptors);
 
       if (compareFaces(liveDescriptor, storedDescriptors)) {
         stopCamera();
         toast({
           title: "Identity Verified",
-          description: "You can now cast your vote.",
+          description: `Match confidence: ${confidence.toFixed(1)}%. You can now cast your vote.`,
         });
       } else {
-        throw new Error("Face verification failed");
+        throw new Error(`Face verification failed. Confidence: ${confidence.toFixed(1)}%`);
       }
     } catch (err) {
       console.error('Face verification error:', err);
       toast({
         variant: "destructive",
         title: "Face Verification Failed",
-        description: "Please try again or contact support if the issue persists.",
+        description: "Please ensure good lighting and that your face is clearly visible.",
       });
+    } finally {
+      setVerificationInProgress(false);
     }
   }
 
@@ -172,15 +190,27 @@ export default function Vote() {
                 className="absolute inset-0 h-full w-full object-cover"
               />
             </div>
+            {verificationConfidence !== null && (
+              <div className="mb-4 text-center">
+                <p className="text-sm mb-1">
+                  Face Match Confidence: <span className="font-bold">{verificationConfidence.toFixed(1)}%</span>
+                </p>
+                <Progress 
+                  value={verificationConfidence} 
+                  className="h-2"
+                  color={verificationConfidence > 70 ? "bg-green-500" : "bg-red-500"} 
+                />
+              </div>
+            )}
             <Button
               onClick={verifyFace}
               className="w-full"
-              disabled={isLoading}
+              disabled={isLoading || verificationInProgress}
             >
-              {isLoading ? (
+              {isLoading || verificationInProgress ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Verifying...
+                  {verificationInProgress ? "Analyzing Face..." : "Verifying..."}
                 </>
               ) : (
                 "Verify Face"
@@ -264,4 +294,20 @@ export default function Vote() {
       )}
     </div>
   );
+}
+function calculateMatchConfidence(liveDescriptor: Float32Array, storedDescriptors: Float32Array[]) {
+  const distances = storedDescriptors.map(storedDescriptor => {
+    let sum = 0;
+    for (let i = 0; i < liveDescriptor.length; i++) {
+      const diff = liveDescriptor[i] - storedDescriptor[i];
+      sum += diff * diff;
+    }
+    return Math.sqrt(sum);
+  });
+
+  const minDistance = Math.min(...distances);
+  const maxDistance = Math.max(...distances);
+  const confidence = ((maxDistance - minDistance) / maxDistance) * 100;
+
+  return confidence;
 }

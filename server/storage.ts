@@ -21,6 +21,11 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   async createVoter(insertVoter: InsertVoter): Promise<Voter> {
+    // Validate that face descriptors are present
+    if (!insertVoter.faceDescriptors || insertVoter.faceDescriptors.length === 0) {
+      throw new Error("Face descriptors are required for voter registration");
+    }
+    
     const [voter] = await db.insert(voters).values(insertVoter).returning();
     return voter;
   }

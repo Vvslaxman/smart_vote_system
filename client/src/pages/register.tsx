@@ -25,13 +25,13 @@ export default function Register() {
   const [, setLocation] = useLocation();
 
   const form = useForm({
-      resolver: zodResolver(insertVoterSchema),
-      defaultValues: {
-        name: "",
-        aadharId: "",
-        faceDescriptors: [] as number[][],
-      },
-    });
+    resolver: zodResolver(insertVoterSchema),
+    defaultValues: {
+      name: "",
+      aadharId: "",
+      faceDescriptors: [] as number[][],
+    },
+  });
 
   useEffect(() => {
     return () => {
@@ -73,7 +73,8 @@ export default function Register() {
             }
           );
 
-          form.setValue("faceDescriptors", descriptors.map(d => Array.from(d)));
+          const sanitizedDescriptors = descriptors.map(d => Array.from(d).map(val => isFinite(val) ? val : 0));
+          form.setValue("faceDescriptors", sanitizedDescriptors);
           setIsRegisterEnabled(true);
 
           toast({
@@ -116,16 +117,18 @@ export default function Register() {
       const hasValidFaceData = data.faceDescriptors && data.faceDescriptors.length > 0;
 
       if (!hasValidFaceData) {
-        const proceed = window.confirm("No face data captured. Do you want to proceed with registration anyway?");
-        if (!proceed) return;
+        toast({
+          variant: "destructive",
+          title: "Face Capture Required",
+          description: "Please complete the face capture process before registering.",
+        });
+        return;
       }
 
       await apiRequest("POST", "/api/voters", data);
       toast({
         title: "Registration Successful",
-        description: hasValidFaceData ? 
-          "Your registration is complete with face verification." :
-          "Registration completed without face verification. You may update this later.",
+        description: "Your registration is complete with face verification.",
       });
       setLocation("/vote");
     } catch (err) {
@@ -174,7 +177,7 @@ export default function Register() {
               />
 
               <div className="space-y-4">
-                <FormLabel>Face Capture (Optional)</FormLabel>
+                <FormLabel>Face Capture <span className="text-red-500">*</span></FormLabel>
                 {isCapturing ? (
                   <div className="space-y-4">
                     <div className="relative aspect-video w-full overflow-hidden rounded-lg border bg-muted">
@@ -228,10 +231,15 @@ export default function Register() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={!form.getValues("name") || !form.getValues("aadharId")}
+                disabled={!form.getValues("name") || !form.getValues("aadharId") || !isRegisterEnabled}
               >
                 Register
               </Button>
+              {!isRegisterEnabled && (
+                <p className="text-xs text-red-500 mt-2 text-center">
+                  * Face capture is required for registration
+                </p>
+              )}
             </form>
           </Form>
         </CardContent>

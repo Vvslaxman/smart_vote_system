@@ -24,7 +24,12 @@ export const votes = pgTable("votes", {
   timestamp: timestamp("timestamp").defaultNow(),
 });
 
-export const insertVoterSchema = createInsertSchema(voters).omit({ id: true, hasVoted: true });
+// Create a schema that requires faceDescriptors
+export const insertVoterSchema = createInsertSchema(voters)
+  .omit({ id: true, hasVoted: true })
+  .extend({
+    faceDescriptors: z.array(z.string()).min(1, "At least one face descriptor is required")
+  });
 export const insertCandidateSchema = createInsertSchema(candidates).omit({ id: true });
 
 export type InsertVoter = z.infer<typeof insertVoterSchema>;

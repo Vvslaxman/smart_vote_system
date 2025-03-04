@@ -10,6 +10,7 @@ import Vote from "@/pages/vote";
 import Results from "@/pages/results";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminCandidates from "@/pages/admin/candidates";
+import { ModelChecker } from './components/ModelChecker'; // Added import
 
 function Router() {
   return (
@@ -31,6 +32,7 @@ function App() {
       <Nav />
       <main className="pt-16 min-h-screen bg-background">
         <Router />
+        <ModelChecker /> 
       </main>
       <Toaster />
     </QueryClientProvider>
