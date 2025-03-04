@@ -1,8 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useLocation } from "wouter";
 import type { Candidate } from "@shared/schema";
 
 export default function Results() {
+  const [, setLocation] = useLocation();
+
   const { data: candidates } = useQuery<Candidate[]>({
     queryKey: ["/api/candidates"],
   });
@@ -15,16 +19,22 @@ export default function Results() {
 
   return (
     <div className="container mx-auto py-8">
-      <Card className="max-w-3xl mx-auto backdrop-blur-lg bg-card/50">
-        <CardHeader>
+      <Card className="max-w-3xl mx-auto">
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Election Results</CardTitle>
+          <Button
+            variant="outline"
+            onClick={() => setLocation("/vote")}
+          >
+            Back to Voting
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="space-y-8">
             {candidates?.map((candidate) => {
               const voteCount = results?.find(r => r.candidateId === candidate.id)?.votes || 0;
               const percentage = totalVotes ? ((voteCount / totalVotes) * 100).toFixed(1) : "0";
-              
+
               return (
                 <div key={candidate.id} className="space-y-2">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">

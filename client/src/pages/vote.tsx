@@ -8,17 +8,16 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getFaceDescriptor, compareFaces } from "@/lib/face";
 import type { Voter, Candidate } from "@shared/schema";
 import { Loader2, Camera } from "lucide-react";
+import { useLocation } from "wouter";
 
 export default function Vote() {
   const [aadharId, setAadharId] = useState("");
   const [voter, setVoter] = useState<Voter>();
   const [isVerifying, setIsVerifying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState(15); // Added, but not used in this version
-  const [verificationAttempts, setVerificationAttempts] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const verificationTimerRef = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const { data: candidates } = useQuery<Candidate[]>({
     queryKey: ["/api/candidates"],
@@ -40,7 +39,7 @@ export default function Vote() {
       });
       setVoter(undefined);
       setAadharId("");
-      stopCamera();
+      setLocation("/results");
     },
   });
 
@@ -51,20 +50,16 @@ export default function Vote() {
   }, []);
 
   function stopCamera() {
-    console.log("Stopping camera...");
     if (videoRef.current?.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach(track => track.stop());
       videoRef.current.srcObject = null;
     }
-    if (verificationTimerRef.current) {
-      clearTimeout(verificationTimerRef.current);
-    }
+    setIsVerifying(false);
   }
 
   async function verifyVoter() {
     try {
-      console.log("Starting voter verification process...");
       setIsLoading(true);
       const res = await apiRequest("GET", `/api/voters/${aadharId}`);
       const voterData = await res.json();
@@ -78,43 +73,39 @@ export default function Vote() {
         return;
       }
 
-      if (!voterData.faceDescriptors || voterData.faceDescriptors.length === 0) {
-        toast({
-          variant: "destructive",
-          title: "Registration Incomplete",
-          description: "No face data found. Please complete registration first.",
+      // Check if voter has face data
+      const hasFaceData = voterData.faceDescriptors && voterData.faceDescriptors.length > 0;
+
+      if (hasFaceData) {
+        // Start face verification process
+        setVoter(voterData);
+        setIsVerifying(true);
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: "user"
+          }
         });
-        return;
-      }
 
-      console.log("Voter found, starting camera...");
-      setVoter(voterData);
-      setIsVerifying(true);
-      setVerificationAttempts(0);
-
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: "user"
-        } 
-      });
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-
-        // Auto-stop camera after 30 seconds
-        verificationTimerRef.current = setTimeout(() => {
-          stopCamera();
-          setIsVerifying(false);
-          toast({
-            variant: "destructive",
-            title: "Verification Timeout",
-            description: "Please try again if needed.",
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await new Promise((resolve) => {
+            if (videoRef.current) {
+              videoRef.current.onloadedmetadata = resolve;
+            }
           });
-        }, 30000);
+        }
+      } else {
+        // Proceed without face verification
+        setVoter(voterData);
+        toast({
+          title: "Voter Verified",
+          description: "You can now proceed to vote.",
+        });
       }
+
     } catch (err) {
       console.error('Voter verification error:', err);
       toast({
@@ -128,33 +119,25 @@ export default function Vote() {
   }
 
   async function verifyFace() {
-    if (!videoRef.current || !voter) return;
-
     try {
-      console.log("Starting face verification...");
-      setIsLoading(true);
-      setVerificationAttempts(prev => prev + 1);
+      if (!videoRef.current || !voter) return;
 
       const canvas = document.createElement("canvas");
       canvas.width = videoRef.current.videoWidth;
       canvas.height = videoRef.current.videoHeight;
-      canvas.getContext("2d")?.drawImage(videoRef.current, 0, 0);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
 
+      ctx.drawImage(videoRef.current, 0, 0);
       const img = new Image();
       img.src = canvas.toDataURL("image/jpeg");
       await new Promise(resolve => img.onload = resolve);
 
-      console.log("Getting face descriptor...");
       const liveDescriptor = await getFaceDescriptor(img);
+      const storedDescriptors = voter.faceDescriptors.map(d => new Float32Array(JSON.parse(d)));
 
-      // Convert stored descriptors from database format to Float32Array
-      const storedDescriptors = voter.faceDescriptors.map(d => new Float32Array(d));
-
-      // Compare the live face descriptor with the stored ones
       if (compareFaces(liveDescriptor, storedDescriptors)) {
-        console.log("Face verification successful");
         stopCamera();
-        setIsVerifying(false);
         toast({
           title: "Identity Verified",
           description: "You can now cast your vote.",
@@ -164,28 +147,18 @@ export default function Vote() {
       }
     } catch (err) {
       console.error('Face verification error:', err);
-      const attemptsLeft = 3 - verificationAttempts;
       toast({
         variant: "destructive",
         title: "Face Verification Failed",
-        description: attemptsLeft > 0 
-          ? `Please ensure your face is clearly visible. ${attemptsLeft} attempts remaining.`
-          : "Maximum verification attempts reached. Please try again later.",
+        description: "Please try again or contact support if the issue persists.",
       });
-
-      if (attemptsLeft <= 0) {
-        stopCamera();
-        setIsVerifying(false);
-      }
-    } finally {
-      setIsLoading(false);
     }
   }
 
   return (
     <div className="container mx-auto py-8">
       {isVerifying ? (
-        <Card className="max-w-md mx-auto backdrop-blur-lg bg-card/50">
+        <Card className="max-w-md mx-auto">
           <CardHeader>
             <CardTitle>Face Verification</CardTitle>
           </CardHeader>
@@ -195,16 +168,14 @@ export default function Vote() {
                 ref={videoRef}
                 autoPlay
                 playsInline
+                muted
                 className="absolute inset-0 h-full w-full object-cover"
               />
             </div>
-            <div className="text-sm text-muted-foreground">
-              Attempts: {verificationAttempts}/3
-            </div>
-            <Button 
-              onClick={verifyFace} 
+            <Button
+              onClick={verifyFace}
               className="w-full"
-              disabled={isLoading || verificationAttempts >= 3}
+              disabled={isLoading}
             >
               {isLoading ? (
                 <>
@@ -212,23 +183,30 @@ export default function Vote() {
                   Verifying...
                 </>
               ) : (
-                <>
-                  <Camera className="mr-2 h-4 w-4" />
-                  Verify Face
-                </>
+                "Verify Face"
               )}
+            </Button>
+            <Button
+              onClick={() => {
+                stopCamera();
+                setIsVerifying(false);
+              }}
+              variant="secondary"
+              className="w-full"
+            >
+              Skip Verification
             </Button>
           </CardContent>
         </Card>
       ) : voter && !voter.hasVoted ? (
-        <Card className="max-w-2xl mx-auto backdrop-blur-lg bg-card/50">
+        <Card className="max-w-2xl mx-auto">
           <CardHeader>
             <CardTitle>Cast Your Vote</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2">
               {candidates?.map((candidate) => (
-                <Card key={candidate.id} className="backdrop-blur-sm bg-background/50">
+                <Card key={candidate.id}>
                   <CardHeader>
                     <CardTitle>{candidate.name}</CardTitle>
                   </CardHeader>
@@ -257,7 +235,7 @@ export default function Vote() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="max-w-md mx-auto backdrop-blur-lg bg-card/50">
+        <Card className="max-w-md mx-auto">
           <CardHeader>
             <CardTitle>Voter Verification</CardTitle>
           </CardHeader>
@@ -267,10 +245,10 @@ export default function Vote() {
               onChange={(e) => setAadharId(e.target.value)}
               placeholder="Enter your Aadhar ID"
             />
-            <Button 
-              onClick={verifyVoter} 
+            <Button
+              onClick={verifyVoter}
               className="w-full"
-              disabled={isLoading || !aadharId}
+              disabled={!aadharId}
             >
               {isLoading ? (
                 <>

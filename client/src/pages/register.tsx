@@ -21,33 +21,30 @@ export default function Register() {
   const [captureCount, setCaptureCount] = useState(0);
   const [isRegisterEnabled, setIsRegisterEnabled] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const captureTimerRef = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
   const form = useForm({
-    resolver: zodResolver(insertVoterSchema),
-    defaultValues: {
-      name: "",
-      aadharId: "",
-      faceDescriptors: [],
-    },
-  });
+      resolver: zodResolver(insertVoterSchema),
+      defaultValues: {
+        name: "",
+        aadharId: "",
+        faceDescriptors: [] as number[][],
+      },
+    });
 
-  // Ensure cleanup
   useEffect(() => {
     return () => {
       stopCapture();
     };
   }, []);
 
-  // Start the face capture process
   async function startCapture() {
     setIsLoading(true);
     setIsCapturing(true);
     setCaptureCount(0);
-    setIsRegisterEnabled(false); // Disable register button while capturing
     setTimeRemaining(15);
+    setCaptureProgress(0);
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -60,24 +57,12 @@ export default function Register() {
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-
-        // Wait for the video element to be ready
-        await new Promise((resolve, reject) => {
-          const checkVideoReady = setInterval(() => {
-            if (videoRef.current?.videoWidth && videoRef.current?.videoHeight) {
-              clearInterval(checkVideoReady);
-              resolve(true);
-            }
-          }, 100); // Check every 100ms if the video is ready
-
-          // Timeout after 5 seconds to avoid an infinite loop
-          setTimeout(() => {
-            clearInterval(checkVideoReady);
-            reject(new Error("Video not ready"));
-          }, 5000); // Timeout after 5 seconds
+        await new Promise((resolve) => {
+          if (videoRef.current) {
+            videoRef.current.onloadedmetadata = resolve;
+          }
         });
 
-        // Start getting face descriptors
         try {
           const descriptors = await getFaceDescriptors(
             videoRef.current,
@@ -88,7 +73,6 @@ export default function Register() {
             }
           );
 
-          // Store the descriptors directly in the form
           form.setValue("faceDescriptors", descriptors.map(d => Array.from(d)));
           setIsRegisterEnabled(true);
 
@@ -101,10 +85,8 @@ export default function Register() {
           toast({
             variant: "destructive",
             title: "Face Capture Failed",
-            description: "Please ensure your face is clearly visible throughout the process.",
+            description: "Please ensure your face is clearly visible and try again.",
           });
-        } finally {
-          stopCapture();
         }
       }
     } catch (err) {
@@ -116,39 +98,34 @@ export default function Register() {
       });
     } finally {
       setIsLoading(false);
+      stopCapture();
     }
   }
 
   function stopCapture() {
-    console.log("Stopping face capture...");
     if (videoRef.current?.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach((track) => track.stop());
+      stream.getTracks().forEach(track => track.stop());
       videoRef.current.srcObject = null;
     }
-    if (captureTimerRef.current) {
-      clearInterval(captureTimerRef.current);
-    }
     setIsCapturing(false);
-    setIsLoading(false);
   }
 
   async function onSubmit(data: any) {
     try {
-      if (!data.faceDescriptors || data.faceDescriptors.length === 0) {
-        toast({
-          variant: "destructive",
-          title: "Face Data Required",
-          description: "Please complete the face capture process before registering.",
-        });
-        return;
+      const hasValidFaceData = data.faceDescriptors && data.faceDescriptors.length > 0;
+
+      if (!hasValidFaceData) {
+        const proceed = window.confirm("No face data captured. Do you want to proceed with registration anyway?");
+        if (!proceed) return;
       }
 
-      console.log("Submitting registration data...");
       await apiRequest("POST", "/api/voters", data);
       toast({
         title: "Registration Successful",
-        description: "You have been registered successfully.",
+        description: hasValidFaceData ? 
+          "Your registration is complete with face verification." :
+          "Registration completed without face verification. You may update this later.",
       });
       setLocation("/vote");
     } catch (err) {
@@ -197,7 +174,7 @@ export default function Register() {
               />
 
               <div className="space-y-4">
-                <FormLabel>Face Capture</FormLabel>
+                <FormLabel>Face Capture (Optional)</FormLabel>
                 {isCapturing ? (
                   <div className="space-y-4">
                     <div className="relative aspect-video w-full overflow-hidden rounded-lg border bg-muted">
@@ -251,7 +228,7 @@ export default function Register() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={!isRegisterEnabled || !form.getValues("name") || !form.getValues("aadharId") || !form.getValues("faceDescriptors").length}
+                disabled={!form.getValues("name") || !form.getValues("aadharId")}
               >
                 Register
               </Button>
